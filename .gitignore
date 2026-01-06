@@ -1,0 +1,22 @@
+# Скомпилированные файлы
+**/target/
+**/*.class
+
+# Настройки IDEA
+.idea/
+*.iml
+*.iws
+out/
+
+# Логи и временные файлы
+*.log
+.mvn/
+help.md
+
+# Файлы системы
+.DS_Store
+Thumbs.db
+
+# База данных H2
+*.mv.db
+*.trace.db
