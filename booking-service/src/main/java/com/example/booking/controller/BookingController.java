@@ -10,15 +10,16 @@ import java.util.List;
 @RequestMapping("/api/bookings")
 @RequiredArgsConstructor
 public class BookingController {
+
     private final BookingService bookingService;
 
     @PostMapping
-    public Booking book(@RequestBody Booking booking) {
+    public Booking create(@RequestBody Booking booking) {
         return bookingService.createBooking(booking);
     }
 
-    @GetMapping("/user/{userId}")
-    public List<Booking> getByUser(@PathVariable Long userId) {
-        return bookingService.getBookingsByUser(userId);
+    @GetMapping
+    public List<Booking> getAll() {
+        return bookingService.getAllBookings();
     }
 }

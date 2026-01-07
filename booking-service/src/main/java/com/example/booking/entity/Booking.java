@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "bookings")
@@ -16,11 +16,13 @@ public class Booking {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private Long userId; // ID из системы безопасности (User)
-    private Long roomId; // ссылка на ID комнаты из hotel-service
+    private Long userId;
+    private Long roomId;
+    private LocalDateTime startDate;
+    private LocalDateTime endDate;
 
-    private LocalDate checkInDate;
-    private LocalDate checkOutDate;
+    // PENDING, CONFIRMED, CANCELLED
+    private String status;
 
-    private String status; // например: PENDING, CONFIRMED, CANCELLED
+    private LocalDateTime createdAt = LocalDateTime.now();
 }

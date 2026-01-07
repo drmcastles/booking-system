@@ -7,6 +7,6 @@ import java.util.List;
 
 @Repository
 public interface RoomRepository extends JpaRepository<Room, Long> {
-    // метод для поиска свободных комнат в конкретном отеле
-    List<Room> findByHotelIdAndIsAvailableTrue(Long hotelId);
+    // Получение комнат, отсортированных по возрастанию timesBooked (требование ТЗ)
+    List<Room> findByAvailableTrueOrderByTimesBookedAscIdAsc();
 }

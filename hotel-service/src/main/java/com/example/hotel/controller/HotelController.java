@@ -1,24 +1,32 @@
 package com.example.hotel.controller;
 
-import com.example.hotel.entity.Hotel;
+import com.example.hotel.entity.Room;
 import com.example.hotel.service.HotelService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/hotels")
+@RequestMapping("/api")
 @RequiredArgsConstructor
 public class HotelController {
     private final HotelService hotelService;
 
-    @GetMapping
-    public List<Hotel> getAll() {
-        return hotelService.getAllHotels();
+    // USER: рекомендованные номера
+    @GetMapping("/rooms/recommend")
+    public List<Room> getRecommended() {
+        return hotelService.getRecommendedRooms();
     }
 
-    @GetMapping("/{id}")
-    public Hotel getById(@PathVariable Long id) {
-        return hotelService.getHotelById(id);
+    // INTERNAL: подтверждение доступности (используется Booking Service)
+    @PostMapping("/rooms/{id}/confirm-availability")
+    public boolean confirm(@PathVariable Long id) {
+        return hotelService.confirmAvailability(id);
+    }
+
+    // INTERNAL: компенсация (снятие блокировки/счетчика)
+    @PostMapping("/rooms/{id}/release")
+    public void release(@PathVariable Long id) {
+        hotelService.releaseRoom(id);
     }
 }
