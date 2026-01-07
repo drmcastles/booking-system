@@ -1,22 +1,24 @@
 package com.example.hotel.controller;
 
-import com.example.hotel.model.Hotel;
-import com.example.hotel.repository.HotelRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import com.example.hotel.entity.Hotel;
+import com.example.hotel.service.HotelService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/hotels")
+@RequiredArgsConstructor
 public class HotelController {
-
-    @Autowired
-    private HotelRepository hotelRepository;
+    private final HotelService hotelService;
 
     @GetMapping
-    public List<Hotel> getAllHotels() {
-        return hotelRepository.findAll();
+    public List<Hotel> getAll() {
+        return hotelService.getAllHotels();
+    }
+
+    @GetMapping("/{id}")
+    public Hotel getById(@PathVariable Long id) {
+        return hotelService.getHotelById(id);
     }
 }
