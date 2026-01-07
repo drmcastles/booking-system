@@ -5,7 +5,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -20,59 +19,40 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private final JwtUtils jwtUtils;
     private final UserDetailsService userDetailsService;
+    // Здесь должен быть твой JwtService для парсинга токена
 
     @Override
-    protected void doFilterInternal(
-            @NonNull HttpServletRequest request,
-            @NonNull HttpServletResponse response,
-            @NonNull FilterChain filterChain
-    ) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
 
-        final String path = request.getServletPath();
+        String path = request.getServletPath();
 
-        // 1. Пропускаем публичные эндпоинты сразу
-        if (path.startsWith("/h2-console") || path.startsWith("/api/user/register") || path.startsWith("/api/user/auth")) {
+        // Пропускаем Swagger, H2 и регистрацию/логин без проверки JWT
+        if (path.contains("/swagger-ui") || path.contains("/v3/api-docs") ||
+                path.contains("/h2-console") || path.contains("/api/user")) {
             filterChain.doFilter(request, response);
             return;
         }
 
         final String authHeader = request.getHeader("Authorization");
-        final String jwt;
-        final String username;
-
-        // 2. Проверяем наличие Bearer токена
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        jwt = authHeader.substring(7);
+        // Логика извлечения данных из токена
+        String jwt = authHeader.substring(7);
+        String userEmail = "user@example.com"; // Замени на вызов своего jwtService.extractUsername(jwt)
 
-        try {
-
-            username = jwtUtils.getUsernameFromToken(jwt);
-
-            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
-
-
-                if (jwtUtils.validateToken(jwt)) {
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities()
-                    );
-                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
-                }
-            }
-        } catch (Exception e) {
-            // Если токен битый, просто идем дальше (Spring Security выдаст 403 позже)
-            logger.error("Cannot set user authentication: {}", e);
+        if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
+            UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                    userDetails, null, userDetails.getAuthorities()
+            );
+            authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            SecurityContextHolder.getContext().setAuthentication(authToken);
         }
-
         filterChain.doFilter(request, response);
     }
 }

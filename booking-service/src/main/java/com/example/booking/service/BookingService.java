@@ -19,50 +19,34 @@ public class BookingService {
         return bookingRepository.findAll();
     }
 
-    public List<Booking> getBookingsByUserId(Long userId) {
-        return bookingRepository.findByUserId(userId);
-    }
-
-    /**
-     * РЕАЛИЗАЦИЯ ДВУХШАГОВОЙ СОГЛАСОВАННОСТИ (SAGA)
-     */
     @Transactional
     public Booking createBooking(Booking booking) {
-        //  Локальное сохранение со статусом PENDING
-        // это гарантирует, что у нас есть запись о попытке бронирования
         booking.setStatus("PENDING");
         Booking savedBooking = bookingRepository.save(booking);
 
+        System.out.println(">>> SAGA STEP 1: Бронирование сохранено как PENDING. ID: " + savedBooking.getId());
+
         try {
-            // Межсервисный запрос к Hotel Service (через Feign Client)
-            // пытаемся подтвердить наличие комнаты и увеличить счетчик times_booked
+            System.out.println(">>> SAGA STEP 2: Запрос к Hotel Service для комнаты: " + savedBooking.getRoomId());
             boolean isAvailable = hotelClient.confirmAvailability(savedBooking.getRoomId());
 
             if (isAvailable) {
-                // ecли отель подтвердил — переводим в финальный статус CONFIRMED
                 savedBooking.setStatus("CONFIRMED");
-                System.out.println(">>> Успех: Бронирование #" + savedBooking.getId() + " подтверждено отелем.");
+                System.out.println(">>> SAGA STEP 3: Отель подтвердил наличие. Статус: CONFIRMED");
             } else {
-                // eсли комната занята или не существует
                 savedBooking.setStatus("CANCELLED");
-                System.out.println(">>> Отказ: Комната недоступна. Статус изменен на CANCELLED.");
+                System.out.println(">>> SAGA STEP 3: Отель отказал (мест нет). Статус: CANCELLED");
             }
         } catch (Exception e) {
-            // КОМПЕНСАЦИЯ (Compensating Transaction)
-            // если Hotel Service упал, произошел тайм-аут или ошибка сети
-            savedBooking.setStatus("CANCELLED");
-            System.err.println(">>> ОШИБКА СВЯЗИ: Hotel Service недоступен. Отмена бронирования...");
+            System.err.println(">>> SAGA ERROR: Ошибка при связи с Hotel Service!");
+            System.err.println(">>> Причина: " + e.getMessage()); // Это самое важное сообщение в консоли
 
-            // На всякий случай пытаемся «разблокировать» комнату в отеле,
-            // если запрос на подтверждение до него все-таки дошел, но ответ потерялся.
+            savedBooking.setStatus("CANCELLED");
             try {
                 hotelClient.releaseRoom(savedBooking.getRoomId());
-            } catch (Exception ignored) {
-                // Отель может быть полностью выключен, поэтому просто игнорируем
-            }
+            } catch (Exception ignored) {}
         }
 
-        // Финальное сохранение обновленного статуса
         return bookingRepository.save(savedBooking);
     }
 }
