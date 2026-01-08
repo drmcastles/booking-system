@@ -20,69 +20,58 @@ public class RoomController {
     private final RoomRepository roomRepository;
     private final HotelRepository hotelRepository;
 
-    // 1. Получить все доступные комнаты
     @GetMapping
     public List<Room> getAllRooms() {
         return roomRepository.findByAvailableTrue();
     }
 
-    // 2. ТЗ: Алгоритм рекомендаций (сортировка по популярности)
+    // Рекомендации: самые бронируемые комнаты сверху
     @GetMapping("/recommend")
     public List<Room> getRecommended() {
-        return roomRepository.findByAvailableTrueOrderByTimesBookedAscIdAsc();
+        return roomRepository.findByAvailableTrueOrderByTimesBookedDescIdAsc();
     }
 
-    // 3. Создать комнату и привязать к отелю (ADMIN)
     @PostMapping("/hotel/{hotelId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Room> addRoom(@PathVariable Long hotelId, @RequestBody Room room) {
         return hotelRepository.findById(hotelId).map(hotel -> {
             room.setHotel(hotel);
+            room.setAvailable(true); // При создании комната доступна
+            room.setTimesBooked(0);
             return ResponseEntity.ok(roomRepository.save(room));
         }).orElse(ResponseEntity.notFound().build());
     }
 
-    // 4. Удалить комнату (ADMIN)
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteRoom(@PathVariable Long id) {
-        roomRepository.deleteById(id);
-        return ResponseEntity.noContent().build();
-    }
-
-    // 5. МЕТОД ДЛЯ SAGA: Подтверждение бронирования
-    // Теперь комната помечается как ЗАНЯТАЯ (available = false)
+    
     @PostMapping("/{id}/confirm-availability")
-    public ResponseEntity<Boolean> confirmAvailability(@PathVariable Long id) {
-        log.info(">>> SAGA: Проверка доступности комнаты ID: {}", id);
+    public boolean confirmAvailability(@PathVariable Long id) {
+        log.info(">>> [SAGA] Проверка подтверждения для комнаты ID: {}", id);
         return roomRepository.findById(id).map(room -> {
+            // Если админ вручную выключил комнату (available=false), вернем false
             if (!room.isAvailable()) {
-                log.warn(">>> SAGA: Комната {} уже занята", id);
-                return ResponseEntity.ok(false);
+                log.warn(">>> Комната {} выведена из эксплуатации", id);
+                return false;
             }
 
-            // ОБНОВЛЕНИЕ СОСТОЯНИЯ
-            room.setAvailable(false); // Блокируем комнату
-            room.setTimesBooked(room.getTimesBooked() + 1); // Повышаем популярность
-
+            // Увеличиваем счетчик бронирований для алгоритма рекомендаций
+            room.setTimesBooked(room.getTimesBooked() + 1);
             roomRepository.save(room);
-            log.info(">>> SAGA: Комната {} УСПЕШНО забронирована", id);
-            return ResponseEntity.ok(true);
-        }).orElse(ResponseEntity.ok(false));
+
+            log.info(">>> Комната {} успешно подтверждена", id);
+            return true;
+        }).orElse(false); // Комната не найдена
     }
 
-    // 6. МЕТОД ДЛЯ SAGA: Отмена/Освобождение (Компенсация)
-    // Возвращает комнату в статус ДОСТУПНА (available = true)
+    /**
+     * SAGA: Отмена (Компенсация).
+     * Если бронирование сорвалось на этапе оплаты или валидации, откатываем счетчик.
+     */
     @PostMapping("/{id}/release")
-    public ResponseEntity<Void> releaseRoom(@PathVariable Long id) {
-        log.info(">>> SAGA: Компенсация. Освобождение комнаты ID: {}", id);
+    public void releaseRoom(@PathVariable Long id) {
+        log.info(">>> [SAGA] Компенсация: откат брони для комнаты ID: {}", id);
         roomRepository.findById(id).ifPresent(room -> {
-            room.setAvailable(true); // Снова открываем для бронирования
-            room.setTimesBooked(Math.max(0, room.getTimesBooked() - 1)); // Откатываем счетчик
-
+            room.setTimesBooked(Math.max(0, room.getTimesBooked() - 1));
             roomRepository.save(room);
-            log.info(">>> SAGA: Комната {} снова ДОСТУПНА", id);
         });
-        return ResponseEntity.ok().build();
     }
 }

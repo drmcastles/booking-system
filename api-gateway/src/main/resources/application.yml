@@ -1,0 +1,37 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      httpclient:
+        connect-timeout: 5000
+        response-timeout: 5s
+      routes:
+        - id: booking-service
+          uri: lb://BOOKING-SERVICE
+          predicates:
+            - Path=/api/bookings/**, /api/auth/**, /api/user/**
+          metadata:
+            sensitiveHeaders: "" # Важно! Пустая строка разрешает все заголовки
+
+        - id: hotel-service
+          uri: lb://HOTEL-SERVICE
+          predicates:
+            - Path=/api/hotels/**, /api/rooms/**
+          metadata:
+            sensitiveHeaders: "" # Разрешаем проброс Authorization
+
+      default-filters:
+        - PreserveHostHeader
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG

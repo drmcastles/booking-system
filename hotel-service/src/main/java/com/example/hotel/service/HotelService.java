@@ -18,7 +18,7 @@ public class HotelService {
 
     // 1. Для клиентов: список рекомендованных (сортировка по популярности)
     public List<Room> getRecommendedRooms() {
-        return roomRepository.findByAvailableTrueOrderByTimesBookedAscIdAsc();
+        return roomRepository.findByAvailableTrueOrderByTimesBookedDescIdAsc();
     }
 
     // 2. Для клиентов: просто все свободные

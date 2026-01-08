@@ -12,12 +12,15 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Room {
-    @Id
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY) // Теперь ID будет создаваться автоматически
     private Long id;
 
-    private String number;
+    private String number; // В JSON нужно слать "number", а не "roomNumber"
+
     private boolean available = true;
+
     private int timesBooked = 0;
 
     @ManyToOne
