@@ -6,10 +6,6 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 @Repository
-
-// это дает нам методы save(), findById(), delete() и т.д.
 public interface UserRepository extends JpaRepository<User, Long> {
-
-    // метод нужен для процесса авторизации (логина)
     Optional<User> findByUsername(String username);
 }

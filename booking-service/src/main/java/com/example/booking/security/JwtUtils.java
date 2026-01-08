@@ -8,20 +8,26 @@ import java.util.Date;
 
 @Component
 public class JwtUtils {
-    private final SecretKey key = Keys.secretKeyFor(io.jsonwebtoken.SignatureAlgorithm.HS256);
+    private final String SECRET_STRING = "SuperSecretKeyForBookingSystem1234567890123456";
+    private final SecretKey key = Keys.hmacShaKeyFor(SECRET_STRING.getBytes());
 
-    public String generateToken(String username) {
+    // Генерируем токен с ролью
+    public String generateToken(String username, String role) {
         return Jwts.builder()
                 .subject(username)
+                .claim("role", role) // Добавляем роль в Payload
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + 86400000))
+                .expiration(new Date(System.currentTimeMillis() + 86400000)) // 24 часа
                 .signWith(key)
                 .compact();
     }
 
-    public String getUsernameFromToken(String token) {
-        return Jwts.parser().verifyWith(key).build()
-                .parseSignedClaims(token).getPayload().getSubject();
+    public String extractUsername(String token) {
+        return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload().getSubject();
+    }
+
+    public String extractRole(String token) {
+        return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload().get("role", String.class);
     }
 
     public boolean validateToken(String token) {

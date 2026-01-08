@@ -4,13 +4,15 @@ import com.example.booking.entity.User;
 import com.example.booking.repository.UserRepository;
 import com.example.booking.security.JwtUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/user")
+@RequestMapping("/api/users")
 @RequiredArgsConstructor
 public class UserController {
 
@@ -18,31 +20,30 @@ public class UserController {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
 
-    // Регистрация нового пользователя
-    @PostMapping("/register")
-    public String register(@RequestBody User user) {
-        // Шифруем пароль перед сохранением в БД
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
-        if (user.getRole() == null) {
-            user.setRole("ROLE_USER");
-        }
-        userRepository.save(user);
-        return "User " + user.getUsername() + " registered successfully!";
+    @GetMapping
+    public List<User> getAllUsers() {
+        return userRepository.findAll();
     }
 
-    // Вход (Аутентификация) - возвращает JWT токен
-    @PostMapping("/auth")
-    public Map<String, String> authenticate(@RequestBody User user) {
-        User foundUser = userRepository.findByUsername(user.getUsername())
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        // Проверяем, совпадает ли введенный пароль с зашифрованным в базе
-        if (passwordEncoder.matches(user.getPassword(), foundUser.getPassword())) {
-            String token = jwtUtils.generateToken(foundUser.getUsername());
-            // Возвращаем токен в виде JSON
-            return Map.of("token", token);
-        } else {
-            throw new RuntimeException("Invalid username or password");
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody User user) {
+        if (userRepository.findByUsername(user.getUsername()).isPresent()) {
+            return ResponseEntity.badRequest().body("Username is already taken");
         }
+
+        user.setPassword(passwordEncoder.encode(user.getPassword()));
+        if (user.getRole() == null || user.getRole().isEmpty()) {
+            user.setRole("ROLE_USER");
+        }
+
+        User savedUser = userRepository.save(user);
+
+        // Исправленная строка 41: теперь передаем два аргумента
+        String token = jwtUtils.generateToken(savedUser.getUsername(), savedUser.getRole());
+
+        return ResponseEntity.ok(Map.of(
+                "token", token,
+                "user", savedUser
+        ));
     }
 }

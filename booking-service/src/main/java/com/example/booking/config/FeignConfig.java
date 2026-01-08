@@ -18,7 +18,7 @@ public class FeignConfig {
                 HttpServletRequest request = attributes.getRequest();
                 String authHeader = request.getHeader("Authorization");
                 if (authHeader != null) {
-                    // Перекидываем токен из входящего запроса в исходящий к Отелю
+                    // Передаем Bearer token дальше
                     requestTemplate.header("Authorization", authHeader);
                 }
             }

@@ -7,7 +7,7 @@ import javax.crypto.SecretKey;
 
 @Component
 public class JwtUtils {
-    // Тот же ключ, что и в Booking Service!
+    // Используем ОДИНАКОВЫЙ ключ для обоих сервисов
     private final String SECRET_STRING = "SuperSecretKeyForBookingSystem1234567890123456";
     private final SecretKey key = Keys.hmacShaKeyFor(SECRET_STRING.getBytes());
 
