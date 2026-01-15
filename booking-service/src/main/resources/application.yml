@@ -1,5 +1,7 @@
 server:
   port: 8082
+  # Критически важно для работы за Gateway
+  forward-headers-strategy: framework
 
 spring:
   application:
@@ -53,3 +55,8 @@ springdoc:
     path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
+  # Группировка заставляет SpringDoc принудительно искать контроллеры
+  group-configs:
+    - group: 'bookings'
+      paths-to-match: /api/bookings/**
+      packages-to-scan: com.example.bookingservice.controller

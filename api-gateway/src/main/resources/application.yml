@@ -11,31 +11,47 @@ spring:
           enabled: true
           lower-case-service-id: true
       routes:
-        # HOTEL SERVICE: Логин, Регистрация, Отели, Комнаты и Рекомендации
+        # HOTEL SERVICE
         - id: hotel-service-route
           uri: lb://HOTEL-SERVICE
           predicates:
-            - Path=/api/users/**, /api/hotels/**, /api/rooms/**, /api/recommendations/**
+            - Path=/api/users/**, /api/hotels/**, /api/rooms/**, /api/recommendations/**, /hotel-docs/**
+          filters:
+            - RewritePath=/hotel-docs/(?<segment>.*), /$\{segment}
 
-        # BOOKING SERVICE: Бронирования
+        # BOOKING SERVICE
         - id: booking-service-route
           uri: lb://BOOKING-SERVICE
           predicates:
-            - Path=/api/bookings/**
+            - Path=/api/bookings/**, /booking-docs/**
+          filters:
+            - RewritePath=/booking-docs/(?<segment>.*), /$\{segment}
 
-        # SWAGGER (Объединенная документация)
-        - id: openapi-docs
+        # ПРОБРОС ИНТЕРФЕЙСА SWAGGER (чтобы не было 404)
+        - id: swagger-ui-static
           uri: lb://HOTEL-SERVICE
           predicates:
-            - Path=/v3/api-docs/**
+            - Path=/swagger-ui/**, /v3/api-docs/**, /webjars/**
 
-# Настройка трассировки (Критерий 13 - Trace ID)
+springdoc:
+  swagger-ui:
+    urls:
+      - name: "1. Hotel Service"
+        url: /hotel-docs/v3/api-docs
+      - name: "2. Booking Service"
+        url: /booking-docs/v3/api-docs
+    # Это заставит Swagger UI грузиться правильно через Gateway
+    path: /swagger-ui.html
+
 management:
   tracing:
     sampling:
-      probability: 1.0  # Пробрасывать ID для 100% запросов
+      probability: 1.0
+  endpoints:
+    web:
+      exposure:
+        include: health, info, tracing
 
-# Формат логов с Trace ID (будет видно в консоли Гейтвея)
 logging:
   pattern:
     level: "%5p [${spring.application.name},%X{traceId:-},%X{spanId:-}]"
