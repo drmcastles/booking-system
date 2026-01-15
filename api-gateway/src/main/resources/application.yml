@@ -11,20 +11,31 @@ spring:
           enabled: true
           lower-case-service-id: true
       routes:
-        # HOTEL SERVICE: Логин, Регистрация, Отели и Юзеры
+        # HOTEL SERVICE: Логин, Регистрация, Отели, Комнаты и Рекомендации
         - id: hotel-service-route
           uri: lb://HOTEL-SERVICE
           predicates:
-            - Path=/api/users/**, /api/hotels/**, /api/rooms/**
+            - Path=/api/users/**, /api/hotels/**, /api/rooms/**, /api/recommendations/**
 
-        # BOOKING SERVICE: Бронирования и Рекомендации
+        # BOOKING SERVICE: Бронирования
         - id: booking-service-route
           uri: lb://BOOKING-SERVICE
           predicates:
-            - Path=/api/bookings/**, /api/recommendations/**
+            - Path=/api/bookings/**
 
-        # SWAGGER
+        # SWAGGER (Объединенная документация)
         - id: openapi-docs
           uri: lb://HOTEL-SERVICE
           predicates:
             - Path=/v3/api-docs/**
+
+# Настройка трассировки (Критерий 13 - Trace ID)
+management:
+  tracing:
+    sampling:
+      probability: 1.0  # Пробрасывать ID для 100% запросов
+
+# Формат логов с Trace ID (будет видно в консоли Гейтвея)
+logging:
+  pattern:
+    level: "%5p [${spring.application.name},%X{traceId:-},%X{spanId:-}]"

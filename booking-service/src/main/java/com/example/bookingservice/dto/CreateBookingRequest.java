@@ -12,5 +12,6 @@ public class CreateBookingRequest {
     private Long userId;
     private Long hotelId;
     private Long roomId;
+    private LocalDateTime checkIn;
     private LocalDateTime checkOut;
 }

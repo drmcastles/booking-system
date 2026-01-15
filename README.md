@@ -67,80 +67,92 @@
     - CRUD-операции
     - Поиск свободных номеров
 
-### Запуск тестов
+### Запуск Unit тестов
 
 ```bash
 mvn test
+```
+###🧪 Сквозное тестирование (End-to-End)
+```
+🧪 Полный сценарий тестирования (PowerShell)
+# Настройки
+$gatewayUrl = "http://localhost:8085/api"
+$id = Get-Random
+$uBody = @{ username="user$id"; password="p"; role="USER" } | ConvertTo-Json
 
+Write-Host "--- Starting E2E Test ---" -ForegroundColor Cyan
 
----
+# 1. Регистрация и получение реального ID пользователя
+$uLogin = Invoke-RestMethod -Uri "$gatewayUrl/users/register" -Method Post -ContentType "application/json" -Body $uBody
+$uLogin = Invoke-RestMethod -Uri "$gatewayUrl/users/login" -Method Post -ContentType "application/json" -Body $uBody
+$headers = @{ "Authorization"="Bearer $($uLogin.token)"; "Content-Type"="application/json" }
 
-```markdown
-## 📡 Полный сценарий тестирования (PowerShell)
+# 2. Тест распределенной транзакции (SAGA)
+# Бронируем комнату в предустановленном отеле (ID: 1)
+$bReq = @{ userId=$uLogin.userId; hotelId=1; startDate="2026-10-01T10:00"; endDate="2026-10-05T10:00" } | ConvertTo-Json
+$res = Invoke-RestMethod -Uri "$gatewayUrl/bookings/create" -Method Post -Headers $headers -Body $bReq
+Write-Host "Status SAGA: $($res.status)" -ForegroundColor Green
 
-```powershell
-# 1. Авторизация (Получение JWT токена)
-$authRes = Invoke-RestMethod -Method Post -Uri "http://localhost:8085/api/users/login" `
-    -ContentType "application/json" `
-    -Body '{"username":"admin", "password":"password"}'
+# 3. Тест алгоритма рекомендаций
+# Комнаты должны вернуться отсортированными по популярности (timesBooked)
+$rooms = Invoke-RestMethod -Uri "$gatewayUrl/hotels/rooms/hotel/1/available?checkIn=2026-12-01T00:00:00&checkOut=2026-12-10T00:00:00" -Method Get -Headers $headers
+Write-Host "Рекомендованные ID комнат: $($rooms -join ', ')" -ForegroundColor Magenta
 
-$token = $authRes.token
-echo "Токен получен: $token"
-
-# 2. Тест SAGA: Создание бронирования
-$bookingBody = @{
-    hotelId = 1
-    userId = 1
-    startDate = "2026-05-01T14:00:00"
-    endDate = "2026-05-10T12:00:00"
-} | ConvertTo-Json
-
-$newBooking = Invoke-RestMethod -Method Post `
-    -Uri "http://localhost:8085/api/bookings/create" `
-    -Headers @{Authorization="Bearer $token"} `
-    -ContentType "application/json" `
-    -Body $bookingBody
-
-echo "Бронирование создано. Итоговый статус SAGA: $($newBooking.status)"
-
-# 3. Просмотр всех бронирований (Admin)
-Invoke-RestMethod -Method Get `
-    -Uri "http://localhost:8085/api/bookings/all" `
-    -Headers @{Authorization="Bearer $token"} | Format-Table
-
-# 4. Проверка рекомендаций
-Invoke-RestMethod -Method Get `
-    -Uri "http://localhost:8085/api/recommendations/1" `
-    -Headers @{Authorization="Bearer $token"}
-    
-```markdown
+# 4. Проверка безопасности (RBAC)
+try { 
+    Invoke-RestMethod -Uri "$gatewayUrl/hotels" -Method Post -Headers $headers -Body (@{name="X"}|ConvertTo-Json) 
+} catch { Write-Host "RBAC: Доступ запрещен (Ок)" -ForegroundColor Yellow }
+```
 
 🧪 Полный сценарий тестирования (cURL)
-# 1. Авторизация и сохранение токена в переменную TOKEN
-TOKEN=$(curl -s -X POST http://localhost:8085/api/users/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin", "password":"password"}' | grep -oP '(?<="token":")[^"]*')
+cat << 'EOF' > full_test_8085.sh
+#!/bin/bash
+```
+#!/bin/bash
 
-echo "Токен получен: $TOKEN"
+GATEWAY_URL="http://localhost:8085/api"
+RAND_ID=$RANDOM
+USER_JSON="{\"username\":\"user$RAND_ID\",\"password\":\"p\",\"role\":\"USER\"}"
 
-# 2. Создание бронирования (SAGA)
-curl -X POST http://localhost:8085/api/bookings/create \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "hotelId": 1,
-    "userId": 1,
-    "startDate": "2026-05-01T14:00:00",
-    "endDate": "2026-05-10T12:00:00"
-  }'
+echo -e "\e[36m=== STARTING cURL E2E TEST ===\e[0m"
 
-# 3. Просмотр всех бронирований
-curl -X GET http://localhost:8085/api/bookings/all -H "Authorization: Bearer $TOKEN"
+# 1. РЕГИСТРАЦИЯ
+echo -e "\n\e[33m[1/4] Registering User...\e[0m"
+curl -s -X POST "$GATEWAY_URL/users/register" \
+     -H "Content-Type: application/json" \
+     -d "$USER_JSON" > /dev/null
 
-# 4. Получение рекомендаций
-curl -X GET http://localhost:8085/api/recommendations/1 -H "Authorization: Bearer $TOKEN"
+# 2. ЛОГИН (извлекаем токен и userId)
+echo -e "\e[33m[2/4] Logging in...\e[0m"
+LOGIN_RES=$(curl -s -X POST "$GATEWAY_URL/users/login" \
+     -H "Content-Type: application/json" \
+     -d "$USER_JSON")
 
-```markdown
+# Для работы этого шага желательно наличие утилиты jq (sudo apt install jq)
+TOKEN=$(echo $LOGIN_RES | jq -r '.token')
+USER_ID=$(echo $LOGIN_RES | jq -r '.userId')
+
+echo -e "\e[32m✅ Logged in! UserID: $USER_ID\e[0m"
+
+# 3. ТЕСТ SAGA (Бронирование отеля ID 1)
+echo -e "\n\e[33m[3/4] Testing SAGA (Hotel ID: 1)...\e[0m"
+BOOKING_JSON="{\"userId\":$USER_ID,\"hotelId\":1,\"startDate\":\"2026-10-01T10:00:00\",\"endDate\":\"2026-10-05T10:00:00\"}"
+
+SAGA_RES=$(curl -s -X POST "$GATEWAY_URL/bookings/create" \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d "$BOOKING_JSON")
+
+echo -e "\e[35mSAGA Response: $SAGA_RES\e[0m"
+
+# 4. ТЕСТ РЕКОМЕНДАЦИЙ
+echo -e "\n\e[33m[4/4] Testing Recommendations...\e[0m"
+curl -s -X GET "$GATEWAY_URL/hotels/rooms/hotel/1/available?checkIn=2026-12-01T00:00:00&checkOut=2026-12-10T00:00:00" \
+     -H "Authorization: Bearer $TOKEN" | jq '.'
+
+echo -e "\n\e[36m=== TEST FINISHED ===\e[0m"
+```
+
 ## 🔐 Права доступа
 
 ### Admin
