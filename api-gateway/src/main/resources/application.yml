@@ -6,32 +6,25 @@ spring:
     name: api-gateway
   cloud:
     gateway:
-      httpclient:
-        connect-timeout: 5000
-        response-timeout: 5s
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
       routes:
-        - id: booking-service
-          uri: lb://BOOKING-SERVICE
-          predicates:
-            - Path=/api/bookings/**, /api/auth/**, /api/user/**
-          metadata:
-            sensitiveHeaders: "" # Важно! Пустая строка разрешает все заголовки
-
-        - id: hotel-service
+        # HOTEL SERVICE: Логин, Регистрация, Отели и Юзеры
+        - id: hotel-service-route
           uri: lb://HOTEL-SERVICE
           predicates:
-            - Path=/api/hotels/**, /api/rooms/**
-          metadata:
-            sensitiveHeaders: "" # Разрешаем проброс Authorization
+            - Path=/api/users/**, /api/hotels/**, /api/rooms/**
 
-      default-filters:
-        - PreserveHostHeader
+        # BOOKING SERVICE: Бронирования и Рекомендации
+        - id: booking-service-route
+          uri: lb://BOOKING-SERVICE
+          predicates:
+            - Path=/api/bookings/**, /api/recommendations/**
 
-eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka/
-
-logging:
-  level:
-    org.springframework.cloud.gateway: DEBUG
+        # SWAGGER
+        - id: openapi-docs
+          uri: lb://HOTEL-SERVICE
+          predicates:
+            - Path=/v3/api-docs/**
